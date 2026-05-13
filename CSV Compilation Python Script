@@ -1,0 +1,257 @@
+write a python code that seperates a txt file like this into different csv file. For example, this txt would give multiple rows of name, affiliation, dep, email, website, interest, one paper title ID=04S3fL0AAAAJ NAME=Joseph C. Osborn AFFILIATION=Pomona College DEPARTMENTS=Computer Science EMAIL=@pomona.edu WEBSITE= INTERESTS=Artificial Intelligence;Game Design;Computer-Aided Game Design;Human-Computer Interaction;Computer Science PAPER=The Trojan Player Typology: A cross-genre, cross-cultural, behaviorally validated scale of video game play motivations|2015|Computers in Human Behavior 49, 354-361, 2015 PAPER=Gemini: bidirectional generation and analysis of games via ASP|2018|Proceedings of the AAAI Conference on Artificial Intelligence and …, 2018 PAPER=Germinate: A Mixed-Initiative Casual Creator for Rhetorical Games|2020|Proceedings of the AAAI Conference on Artificial Intelligence and …, 2020 PAPER=Exploring level blending across platformers via paths and affordances|2020|Proceedings of the AAAI Conference on Artificial Intelligence and …, 2020
+
+
+You don’t need anything fancy here—just a deterministic parser that treats blank lines or repeated NAME= as record boundaries and explodes multi-valued fields (papers, interests) into rows.
+
+Below is a clean, production-style Python script (pandas-based) that outputs three normalized CSVs:
+
+profiles.csv (one row per person)
+papers.csv (one row per paper)
+interests.csv (one row per interest)
+Python code
+import pandas as pd
+
+def parse_txt_to_csv(input_file):
+    profiles = []
+    papers = []
+    interests = []
+
+    current = {
+        "name": "",
+        "affiliation": "",
+        "departments": "",
+        "email": "",
+        "website": "",
+        "interests": [],
+        "papers": []
+    }
+
+    def save_current():
+        if current["name"] == "":
+            return
+        
+        profiles.append({
+            "name": current["name"],
+            "affiliation": current["affiliation"],
+            "departments": current["departments"],
+            "email": current["email"],
+            "website": current["website"]
+        })
+
+        for interest in current["interests"]:
+            interests.append({
+                "name": current["name"],
+                "interest": interest.strip()
+            })
+
+        for p in current["papers"]:
+            parts = p.split("|")
+            title = parts[0] if len(parts) > 0 else ""
+            year = parts[1] if len(parts) > 1 else ""
+            venue = parts[2] if len(parts) > 2 else ""
+
+            papers.append({
+                "name": current["name"],
+                "title": title,
+                "year": year,
+                "venue": venue
+            })
+
+    with open(input_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith("NAME="):
+                # save previous record
+                save_current()
+
+                # reset
+                current = {
+                    "name": line.replace("NAME=", "").strip(),
+                    "affiliation": "",
+                    "departments": "",
+                    "email": "",
+                    "website": "",
+                    "interests": [],
+                    "papers": []
+                }
+
+            elif line.startswith("AFFILIATION="):
+                current["affiliation"] = line.replace("AFFILIATION=", "").strip()
+
+            elif line.startswith("DEPARTMENTS="):
+                current["departments"] = line.replace("DEPARTMENTS=", "").strip()
+
+            elif line.startswith("EMAIL="):
+                current["email"] = line.replace("EMAIL=", "").strip()
+
+            elif line.startswith("WEBSITE="):
+                current["website"] = line.replace("WEBSITE=", "").strip()
+
+            elif line.startswith("INTERESTS="):
+                vals = line.replace("INTERESTS=", "").split(";")
+                current["interests"] = vals
+
+            elif line.startswith("PAPER="):
+                current["papers"].append(line.replace("PAPER=", "").strip())
+
+        # save last record
+        save_current()
+
+    # convert to DataFrames
+    df_profiles = pd.DataFrame(profiles)
+    df_papers = pd.DataFrame(papers)
+    df_interests = pd.DataFrame(interests)
+
+    # write CSVs
+    df_profiles.to_csv("profiles.csv", index=False)
+    df_papers.to_csv("papers.csv", index=False)
+    df_interests.to_csv("interests.csv", index=False)
+
+    print("Done: profiles.csv, papers.csv, interests.csv created.")
+
+
+# usage
+parse_txt_to_csv("input.txt")
+What this gives you
+profiles.csv
+
+| name | affiliation | departments | email | website |
+
+papers.csv
+
+| name | title | year | venue |
+
+interests.csv
+
+| name | interest |
+
+Design choices (important)
+Normalized schema → avoids duplication and is database-ready
+Robust parsing → doesn’t break if:
+website is empty
+papers have missing fields
+Scalable → works for thousands of profiles
+If you want a single flat CSV instead
+
+Say so—there’s a different approach (Cartesian expansion), but it’s usually worse for analysis.
+
+i want one csv file
+
+If you want a single CSV, you need to decide how to handle multi-valued fields (papers, interests). The cleanest approach is:
+
+One row per paper
+Repeat the profile info
+Keep interests as a single semicolon-separated string
+Python code (single CSV output)
+import pandas as pd
+
+def txt_to_single_csv(input_file, output_file="output.csv"):
+    rows = []
+
+    current = {
+        "name": "",
+        "affiliation": "",
+        "departments": "",
+        "email": "",
+        "website": "",
+        "interests": "",
+        "papers": []
+    }
+
+    def save_current():
+        if current["name"] == "":
+            return
+        
+        # If no papers, still create one row
+        if len(current["papers"]) == 0:
+            rows.append({
+                "name": current["name"],
+                "affiliation": current["affiliation"],
+                "departments": current["departments"],
+                "email": current["email"],
+                "website": current["website"],
+                "interests": current["interests"],
+                "title": "",
+                "year": "",
+                "venue": ""
+            })
+        else:
+            for p in current["papers"]:
+                parts = p.split("|")
+                title = parts[0] if len(parts) > 0 else ""
+                year = parts[1] if len(parts) > 1 else ""
+                venue = parts[2] if len(parts) > 2 else ""
+
+                rows.append({
+                    "name": current["name"],
+                    "affiliation": current["affiliation"],
+                    "departments": current["departments"],
+                    "email": current["email"],
+                    "website": current["website"],
+                    "interests": current["interests"],
+                    "title": title,
+                    "year": year,
+                    "venue": venue
+                })
+
+    with open(input_file, "r", encoding="utf-8") as f:
+        for line in f:
+            line = line.strip()
+
+            if not line:
+                continue
+
+            if line.startswith("NAME="):
+                save_current()
+                current = {
+                    "name": line.replace("NAME=", "").strip(),
+                    "affiliation": "",
+                    "departments": "",
+                    "email": "",
+                    "website": "",
+                    "interests": "",
+                    "papers": []
+                }
+
+            elif line.startswith("AFFILIATION="):
+                current["affiliation"] = line.replace("AFFILIATION=", "").strip()
+
+            elif line.startswith("DEPARTMENTS="):
+                current["departments"] = line.replace("DEPARTMENTS=", "").strip()
+
+            elif line.startswith("EMAIL="):
+                current["email"] = line.replace("EMAIL=", "").strip()
+
+            elif line.startswith("WEBSITE="):
+                current["website"] = line.replace("WEBSITE=", "").strip()
+
+            elif line.startswith("INTERESTS="):
+                current["interests"] = line.replace("INTERESTS=", "").strip()
+
+            elif line.startswith("PAPER="):
+                current["papers"].append(line.replace("PAPER=", "").strip())
+
+        save_current()
+
+    df = pd.DataFrame(rows)
+    df.to_csv(output_file, index=False)
+
+    print(f"Saved to {output_file}")
+
+
+# usage
+txt_to_single_csv("input.txt")
+Output structure
+
+Each row = one paper:
+
+| name | affiliation | departments | email | website | interests | title | year | venue |
+
+Why this structure is the right choice
+Avoids exploding rows unnecessarily
+Keeps dataset tidy and analyzable
+Compatible with regression / NLP / filtering tasks
