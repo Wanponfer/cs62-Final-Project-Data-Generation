@@ -1,0 +1,110 @@
+name,affiliation,departments,email,website,interests,title,year,venue Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Trusting virtual agents: The effect of personality,2019,"ACM Transactions on Interactive Intelligent Systems (TiiS) 9 (2-3), 1-36, 2019" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Makers' marks: Physical markup for designing and fabricating functional objects,2015,"Proceedings of the 28th Annual ACM Symposium on User Interface Software …, 2015" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Confiding in and listening to virtual agents: The effect of personality,2017,"Proceedings of the 22nd international conference on intelligent user …, 2017" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Beyond the artifact: power as a lens for creativity support tools,2023,"Proceedings of the 36th Annual ACM Symposium on User Interface Software and …, 2023" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,What we can learn from visual artists about software development,2021,"Proceedings of the 2021 CHI Conference on Human Factors in Computing Systems …, 2021" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Editing spatial layouts through tactile templates for people with visual impairments,2019,"Proceedings of the 2019 CHI Conference on Human Factors in Computing Systems …, 2019" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Supporting visual artists in programming through direct inspection and control of program execution,2020,"Proceedings of the 2020 CHI Conference on Human Factors in Computing Systems …, 2020" Jingyi Li,"Assistant Professor of Computer Science, Pomona College",Computer Science,@pomona.edu,http://jingyi.me/,human-computer interaction,Understanding Version Control as Material Interaction with Quickpose,2023,"Proceedings of the 2023 CHI Conference on Human Factors in Computing Systems …, 2023"             
+With same data structure as this, write a python script which can generate coauthors in the new columns after each paper. Also these coauthors are professors in the data and randomly add as the coauthors
+
+Show more
+Monday 4:26 PM
+
+
+Worked for 1m 32s
+Done. I updated add_coauthors.py so it:
+
+reads the same CSV structure as data/all_output.csv
+inserts coauthor_1, coauthor_2, coauthor_3 immediately after venue
+randomly picks coauthors only from professor names already in the data
+avoids assigning the paper’s own professor as their own coauthor
+preserves values like 2019 instead of converting them to 2019.0
+I also generated data/all_output_with_coauthors.csv with:
+
+python3 add_coauthors.py --input data/all_output.csv --output data/all_output_with_coauthors.csv --min 1 --max 3 --seed 42
+Verified: 3,448 data rows, 0 unknown coauthors, 0 self-coauthors.
+
+
+all_output_with_coauthors.csv
+Spreadsheet · CSV
+Open
+
+1 file changed
+Undo
+
+Review
+
+add_coauthors.py
+
+
+
+
+Monday 4:27 PM
+There is bug. for example on line 13. the third coauthor is not a professor's name. it's more like something in the paper's title
+Monday 4:32 PM
+
+
+Worked for 57s
+Fixed. The bug was that one malformed CSV row had name = "romental Analysis", so the old script treated that text as a professor name.
+
+I updated add_coauthors.py so the coauthor pool only includes rows whose identity fields look valid: real-looking professor name, Pomona email field, non-shifted affiliation/department fields.
+
+I regenerated data/all_output_with_coauthors.csv. Line 13 now has:
+
+Jane Liu,Erin Runions,Ellie Anderson
+Validation now reports:
+
+valid_professors=47
+bad_coauthors=0
+self_coauthors=0
+
+all_output_with_coauthors.csv
+Spreadsheet · CSV
+Open
+
+1 file changed
+Undo
+
+Review
+
+add_coauthors.py
+
+
+
+
+Monday 4:33 PM
+check correctness of the data
+Monday 4:34 PM
+
+
+Worked for 2m
+I checked both data/all_output.csv and data/all_output_with_coauthors.csv.
+
+Main Findings
+
+The generated coauthor data is now correct:
+
+valid_professors=48
+bad_coauthors=0
+self_coauthors=0
+duplicate_coauthors_same_row=0
+malformed_rows_with_coauthors=0
+I also updated add_coauthors.py so malformed source rows are skipped when adding coauthors.
+
+The source CSV still has data-quality problems:
+
+data/all_output.csv line 3107 (line 3107) is structurally broken. It has duplicated/misaligned identity fields, so year becomes research interests instead of a number.
+
+data/all_output.csv line 3109 (line 3109) is also broken. The name value is romental Analysis, which is the tail of Enviromental Analysis, not a professor.
+
+data/all_output.csv line 328 (line 328) has a missing paper title.
+
+There are 37 duplicate name + title + year paper groups.
+
+There are 215 rows with year = 0 and 497 rows with missing venue. These may be acceptable placeholders from Google Scholar scraping, but they are not clean publication records.
+
+So: the coauthor generation is clean now, but the original scraped dataset still has a few malformed rows and many incomplete records.
+
+
+all_output.csv
+Spreadsheet · CSV
+Open
+
+
+all_output_with_coauthors.csv
+Spreadsheet · CSV
+Open
